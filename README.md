@@ -1,19 +1,55 @@
-# 🔐 Key Silk — MCP Secret Server
+<p align="center">
+  <img src="docs/assets/logo.png" alt="Key Silk" width="140" />
+</p>
 
-**Secure, human-in-the-loop secret management for AI-assisted development.**
+<h1 align="center">Key Silk</h1>
 
-Key Silk is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that gives AI coding agents the ability to inject secrets into your projects — without ever exposing secret values to the LLM.
+<p align="center">
+  <strong>Stop pasting secrets into AI chat.</strong><br/>
+  <sub>Secure, human-in-the-loop secret management for AI-assisted development.</sub>
+</p>
 
-## The Problem
+<p align="center">
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-how-it-works">How It Works</a> •
+  <a href="#-interfaces">Interfaces</a> •
+  <a href="#-security-model">Security</a> •
+  <a href="#-mcp-tools">MCP Tools</a> •
+  <a href="#-development">Development</a>
+</p>
 
-When AI coding assistants need API keys or credentials to set up a project, you're forced to paste secrets directly into the chat. Those secrets then live in:
-- The LLM's context window  
-- API logs and training pipelines  
-- Chat history
+<p align="center">
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" />
+  <img src="https://img.shields.io/badge/MCP-native-00d9ff?style=flat-square" alt="MCP Native" />
+  <img src="https://img.shields.io/badge/encryption-AES--256--GCM-brightgreen?style=flat-square" alt="AES-256-GCM" />
+  <img src="https://img.shields.io/badge/node-%3E%3D18-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node >= 18" />
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+</p>
 
-**Key Silk eliminates this entirely.** Secrets are stored in a local encrypted vault and injected directly to `.env` files. The LLM only sees metadata (key names, groups, types) — never the values.
+<br/>
 
-## How It Works
+<p align="center">
+  <img src="docs/assets/social-preview.png" alt="Key Silk — Stop pasting secrets into AI chat" width="700" />
+</p>
+
+<br/>
+
+---
+
+Key Silk is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server that gives AI coding agents the ability to inject secrets into your projects — **without ever exposing secret values to the LLM**.
+
+> **The problem:** Every time you paste an API key into Claude, Cursor, or Copilot, that secret enters the context window, API logs, and chat history. Key Silk eliminates this by keeping values in an encrypted vault and only exposing metadata (key names, groups, types) to the AI agent. Injection requires human approval on your terminal.
+
+<br/>
+
+## 🔐 How It Works
+
+<p align="center">
+  <img src="docs/assets/architecture.png" alt="Key Silk Architecture" width="600" />
+</p>
+
+<details>
+<summary><strong>Text diagram (accessible version)</strong></summary>
 
 ```
 ┌──────────────┐     metadata only      ┌──────────────┐
@@ -39,65 +75,64 @@ When AI coding assistants need API keys or credentials to set up a project, you'
                                         └──────────────┘
 ```
 
-**Key security guarantees:**
-- 🔒 Secret values **never** enter the LLM context window
-- ✋ Every injection requires **human approval** on your terminal
-- 📋 Every operation is recorded in an **append-only audit log**
-- 🔑 Vault encrypted with **AES-256-GCM** + **PBKDF2** (600K iterations)
+</details>
+
+<br/>
+
+<p align="center">
+  <img src="docs/assets/before-after.png" alt="Before and After Key Silk" width="480" />
+</p>
+
+<br/>
+
+<table>
+<tr>
+<td width="25%" align="center">
+🔒<br/><strong>Zero Exposure</strong><br/><sub>Secret values <em>never</em> enter the LLM context window</sub>
+</td>
+<td width="25%" align="center">
+✋<br/><strong>Human Approval</strong><br/><sub>Every injection requires approval on your terminal</sub>
+</td>
+<td width="25%" align="center">
+📋<br/><strong>Audit Trail</strong><br/><sub>Append-only log of every operation, including denials</sub>
+</td>
+<td width="25%" align="center">
+🔑<br/><strong>AES-256-GCM</strong><br/><sub>PBKDF2 key derivation with 600K iterations</sub>
+</td>
+</tr>
+</table>
+
+<br/>
 
 ---
 
-## Quick Start
-
-### 1. Install
+## 🚀 Quick Start
 
 ```bash
+# 1. Install
 git clone https://github.com/itsocialist/key-silk.git
-cd key-silk
-npm install
-npm run build
-npm link        # makes `key-silk` available globally
-```
+cd key-silk && npm install && npm run build && npm link
 
-### 2. Initialize Your Vault
+# 2. Initialize vault
+key-silk init                               # prompted for passphrase
 
-```bash
-key-silk init
-# Enter a master passphrase when prompted
-```
-
-### 3. Add Secrets
-
-```bash
+# 3. Add secrets
 export MCP_VAULT_PASSPHRASE="your-passphrase"
-
-# Add an API key
 key-silk add ANTHROPIC_API_KEY -t api_key -g ai-providers
-
-# Add a database URL
 key-silk add DATABASE_URL -t other -g infrastructure
 
-# Add a secret with an expiration date
-key-silk add TEMP_TOKEN -t oauth_token -g temporary -e 2026-04-01T00:00:00Z
-```
-
-### 4. Inject Into a Project
-
-```bash
+# 4. Inject into a project
 key-silk inject -g ai-providers --target /path/to/project/.env
+
+# 5. Launch the interactive dashboard
+key-silk                                    # TUI launches by default
+
+# 6. Connect to your AI agent (MCP)
+key-silk serve                              # stdio transport for Claude/Cursor
 ```
 
-### 5. Launch the Interactive Dashboard
-
-```bash
-key-silk          # launches TUI when run with no arguments
-# or explicitly:
-key-silk tui
-```
-
-### 6. Connect to Your AI Agent (MCP)
-
-Add to your MCP client configuration (e.g., Claude Desktop):
+<details>
+<summary><strong>MCP client configuration (Claude Desktop, Cursor, etc.)</strong></summary>
 
 ```json
 {
@@ -113,59 +148,56 @@ Add to your MCP client configuration (e.g., Claude Desktop):
 }
 ```
 
-Now your AI agent can discover and inject secrets without ever seeing the values.
+</details>
+
+<br/>
 
 ---
 
-## Interfaces
+## 🖥️ Interfaces
 
-Key Silk provides **three interfaces** for different workflows:
+Key Silk provides **three interfaces** optimized for different workflows:
+
+### Interactive Dashboard (TUI)
+
+Run `key-silk` with no arguments to launch the full interactive experience:
+
+<p align="center">
+  <img src="docs/assets/tui-preview.png" alt="Key Silk TUI Dashboard" width="520" />
+</p>
+
+- Color-coded tables with expiration status — ✓ Active, 🟡 Expiring, 🔴 Expired
+- Menu-driven workflows for every vault operation
+- `.gitignore` safety warnings during injection
+- Template selection for `.env` file generation
 
 ### CLI (Direct Commands)
+
 Fast, scriptable commands for automation and CI:
+
 ```bash
-key-silk list
-key-silk add API_KEY -t api_key -g prod
-key-silk inject -g prod --target .env
-```
-
-### TUI (Interactive Dashboard)
-Menu-driven terminal interface with color-coded tables, guided workflows, and visual status:
-```bash
-key-silk        # or `key-silk tui`
-```
-
-```
-  ╔═══════════════════════════════════════════╗
-  ║   🔐 Key Silk — Secret Manager            ║
-  ║   Secure secrets for AI development        ║
-  ╚═══════════════════════════════════════════╝
-
-  Backend: encrypted-file  │  ● connected  │  ~/.mcp-secrets/vault.enc
-
-  ? What would you like to do?
-    📋  List Secrets
-    📁  List Groups
-    ➕  Add Secret
-    🗑️   Remove Secret
-    🔄  Rotate Secret
-    💉  Inject to .env
-    ⏰  Expiring Secrets
-    📜  Audit Trail
-    📄  Templates
-    👋  Quit
+key-silk list                                     # show all secrets
+key-silk add API_KEY -t api_key -g prod           # add interactively
+key-silk inject -g prod --target .env             # inject to file
+key-silk rotate API_KEY                           # rotate a secret
+key-silk audit -k API_KEY                         # query audit trail
+key-silk expiring -d 14                           # check expirations
 ```
 
 ### MCP Server (AI Agent Interface)
-Runs as a background MCP server that AI coding agents connect to:
+
+Runs as a headless MCP server for AI coding assistants:
+
 ```bash
-key-silk serve                       # stdio (default)
-key-silk serve --transport sse       # Server-Sent Events for remote agents
+key-silk serve                       # stdio (default — Claude, Cursor)
+key-silk serve --transport sse       # SSE for remote agents
 ```
+
+<br/>
 
 ---
 
-## CLI Reference
+## 📋 CLI Reference
 
 | Command | Description |
 |---|---|
@@ -183,7 +215,8 @@ key-silk serve --transport sse       # Server-Sent Events for remote agents
 | `key-silk serve [--transport stdio\|sse]` | Start the MCP server |
 | `key-silk tui` | Launch interactive TUI |
 
-### Add Options
+<details>
+<summary><strong>Add Options</strong></summary>
 
 ```bash
 key-silk add <KEY> \
@@ -193,7 +226,10 @@ key-silk add <KEY> \
   -e, --expires <date>      # ISO 8601 expiration date
 ```
 
-### Inject Options
+</details>
+
+<details>
+<summary><strong>Inject Options</strong></summary>
 
 ```bash
 key-silk inject \
@@ -203,65 +239,81 @@ key-silk inject \
   --overwrite               # Overwrite existing keys
 ```
 
----
+</details>
 
-## MCP Tools
-
-When running as an MCP server, Key Silk exposes these tools to AI agents:
-
-| Tool | Description |
-|---|---|
-| `secret_list_groups` | List available secret groups |
-| `secret_list` | List secrets (metadata only, with expiration warnings) |
-| `secret_inject` | Inject secrets to `.env` (requires human approval) |
-| `secret_remove` | Remove a secret (requires human approval) |
-| `secret_rotate` | Rotate a secret (new value entered via terminal) |
-| `secret_audit` | Query the audit trail |
-| `secret_expiring` | List secrets nearing expiration |
-
-**All tools enforce the security contract:** secret values are never returned in tool responses.
+<br/>
 
 ---
 
-## Vault Backends
+## 🤖 MCP Tools
 
-Key Silk supports three vault backends:
+When running as an MCP server, Key Silk exposes 7 tools to AI agents:
 
-### Encrypted File (Default)
-Local AES-256-GCM encrypted JSON file. No external dependencies.
+| Tool | Description | Human Approval |
+|---|---|---|
+| `secret_list_groups` | List available secret groups | — |
+| `secret_list` | List secrets (metadata only, with expiration warnings) | — |
+| `secret_inject` | Inject secrets to `.env` | ✅ Required |
+| `secret_remove` | Remove a secret | ✅ Required |
+| `secret_rotate` | Rotate a secret (new value entered via terminal) | ✅ Required |
+| `secret_audit` | Query the audit trail | — |
+| `secret_expiring` | List secrets nearing expiration | — |
 
+> **Security contract:** Secret values are never returned in tool responses. The AI agent sees key names, groups, types, and expiration dates — never the actual secret values.
+
+<br/>
+
+---
+
+## 🗄️ Vault Backends
+
+Key Silk supports pluggable vault backends — use whatever fits your workflow:
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### 🔐 Encrypted File
+**Default** — Zero dependencies
 ```bash
 key-silk init --backend encrypted-file
 ```
+AES-256-GCM encrypted JSON on local disk. Perfect for solo developers.
 
-### 1Password CLI
-Delegates to your existing 1Password vault via the `op` CLI.
+</td>
+<td width="33%" valign="top">
 
+### 🔑 1Password CLI
+**Team** — Leverage existing vault
 ```bash
-# Prerequisites: install 1Password CLI and authenticate
-op signin
-
-# Configure
 export MCP_VAULT_BACKEND=onepassword
 export MCP_1PASSWORD_VAULT=Development
 ```
+Delegates to `op` CLI. Key Silk becomes the MCP bridge.
 
-### Doppler
-Integrates with Doppler's secrets management platform.
+</td>
+<td width="33%" valign="top">
 
+### ☁️ Doppler
+**Platform** — Cloud-native
 ```bash
-# Prerequisites: install Doppler CLI and authenticate
-doppler login
-
-# Configure
 export MCP_VAULT_BACKEND=doppler
 export MCP_DOPPLER_PROJECT=my-project
 export MCP_DOPPLER_CONFIG=dev
 ```
+Integrates with Doppler's API.
+
+</td>
+</tr>
+</table>
+
+Same CLI. Same MCP tools. Same audit trail. Different vault — **your choice**.
+
+<br/>
 
 ---
 
-## Templates
+## 📄 Templates
 
 Key Silk ships with `.env` templates for common project types:
 
@@ -281,11 +333,18 @@ key-silk templates
 key-silk inject -g ai-providers --target .env --template nextjs
 ```
 
+Templates are `.env.tmpl` files — add your own in the `templates/` directory.
+
+<br/>
+
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 Configure via environment variables or `~/.mcp-secrets/config.json`:
+
+<details>
+<summary><strong>All configuration options</strong></summary>
 
 | Variable | Default | Description |
 |---|---|---|
@@ -302,9 +361,10 @@ Configure via environment variables or `~/.mcp-secrets/config.json`:
 | `MCP_DOPPLER_PROJECT` | — | Doppler project name |
 | `MCP_DOPPLER_CONFIG` | `dev` | Doppler config environment |
 
----
+</details>
 
-## Auto-Approve Policies
+<details>
+<summary><strong>Auto-Approve Policies (advanced)</strong></summary>
 
 For trusted environments, configure policies that skip interactive approval:
 
@@ -324,35 +384,43 @@ For trusted environments, configure policies that skip interactive approval:
 }
 ```
 
-All conditions must match for auto-approval. Every auto-approved injection is still logged in the audit trail.
+All conditions must match for auto-approval. Every auto-approved injection is still audit-logged.
+
+</details>
+
+<br/>
 
 ---
 
-## Security Model
+## 🛡️ Security Model
 
-| Layer | Protection |
-|---|---|
-| **Encryption** | AES-256-GCM with PBKDF2 (600K iterations) |
-| **File permissions** | `0600` on vault, `.env`, and audit files |
-| **Memory** | Key buffers zeroed after use (`scrubMemory()`) |
-| **LLM isolation** | `getSecretValues()` is internal-only; never exposed via MCP |
-| **Approval** | Interactive TTY prompt via `/dev/tty` — works even under MCP stdio |
-| **Audit** | Append-only JSON-lines log of every operation |
-| **Backup** | Automatic `.bak` file created before every vault write |
-| **Git safety** | `.gitignore` check warns if target `.env` is not excluded |
+<table>
+<tr><td>🔐 <strong>Encryption</strong></td><td>AES-256-GCM with PBKDF2 key derivation (600,000 iterations)</td></tr>
+<tr><td>📁 <strong>File Permissions</strong></td><td><code>0600</code> on vault, <code>.env</code>, and audit files</td></tr>
+<tr><td>🧹 <strong>Memory</strong></td><td>Key buffers zeroed after use (<code>scrubMemory()</code>)</td></tr>
+<tr><td>🚫 <strong>LLM Isolation</strong></td><td><code>getSecretValues()</code> is internal-only — never exposed via MCP</td></tr>
+<tr><td>✋ <strong>Approval</strong></td><td>Interactive TTY prompt via <code>/dev/tty</code> — works even under MCP stdio</td></tr>
+<tr><td>📋 <strong>Audit</strong></td><td>Append-only JSON-lines log of every operation</td></tr>
+<tr><td>💾 <strong>Backup</strong></td><td>Automatic <code>.bak</code> file before every vault write</td></tr>
+<tr><td>⚠️ <strong>Git Safety</strong></td><td><code>.gitignore</code> check warns if target <code>.env</code> is not excluded</td></tr>
+</table>
+
+The codebase is ~2,500 lines of TypeScript, small enough to audit in an afternoon. [Read the source →](https://github.com/itsocialist/key-silk/tree/main/src)
+
+<br/>
 
 ---
 
-## Development
+## 🧑‍💻 Development
 
 ```bash
 # Install dependencies
 npm install
 
-# Run in development mode (without building)
+# Run in development mode (TypeScript, no build step)
 npm run dev -- <command>     # e.g., npm run dev -- list
 
-# Run tests
+# Run tests (22 tests)
 npm test
 
 # Build for production
@@ -365,12 +433,17 @@ npm link
 key-silk <command>
 ```
 
----
-
-## License
-
-MIT
+<br/>
 
 ---
 
-Built with the [Model Context Protocol](https://modelcontextprotocol.io) SDK.
+## 📝 License
+
+[MIT](LICENSE) — free for personal and commercial use.
+
+---
+
+<p align="center">
+  <sub>Built with the <a href="https://modelcontextprotocol.io">Model Context Protocol</a> SDK</sub><br/>
+  <sub>Made with 🔐 by <a href="https://github.com/itsocialist">@itsocialist</a></sub>
+</p>

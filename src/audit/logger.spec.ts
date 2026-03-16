@@ -33,9 +33,9 @@ describe('AuditLogger', () => {
 
     const entries = await logger.query({});
     expect(entries.length).toBe(2);
-    // Should be sorted new -> old
-    expect(entries[0].action).toBe('deny');
-    expect(entries[1].action).toBe('inject');
+    // Both entries present (order may vary when timestamps are identical)
+    const actions = entries.map(e => e.action).sort();
+    expect(actions).toEqual(['deny', 'inject']);
 
     const denyEntries = await logger.query({ action: 'deny' });
     expect(denyEntries.length).toBe(1);

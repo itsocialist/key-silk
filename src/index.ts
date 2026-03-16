@@ -14,18 +14,31 @@ import * as path from 'path';
 
 const program = new Command();
 
-function getPassphrase(): string {
-  const p = process.env.MCP_VAULT_PASSPHRASE;
-  if (!p) {
-    console.error("FATAL: Set the MCP_VAULT_PASSPHRASE environment variable.");
-    process.exit(1);
+async function getPassphrase(interactive: boolean = true): Promise<string> {
+  // 1. Check environment variable first
+  const envPass = process.env.MCP_VAULT_PASSPHRASE;
+  if (envPass) return envPass;
+
+  // 2. If interactive (TTY available), prompt for it
+  if (interactive && process.stdin.isTTY) {
+    const { passphrase } = await prompt<{ passphrase: string }>({
+      type: 'password',
+      name: 'passphrase',
+      message: '🔐 Enter vault passphrase'
+    });
+    return passphrase;
   }
-  return p;
+
+  // 3. Non-interactive and no env var — fail
+  console.error('FATAL: Set the MCP_VAULT_PASSPHRASE environment variable (no TTY for interactive prompt).');
+  process.exit(1);
 }
 
-async function openVault(config: ServerConfig): Promise<VaultBackend> {
+async function openVault(config: ServerConfig, interactive: boolean = true): Promise<VaultBackend> {
   const vault = createVault(config);
-  const passphrase = config.vaultBackend === 'encrypted-file' ? getPassphrase() : undefined;
+  const passphrase = config.vaultBackend === 'encrypted-file'
+    ? await getPassphrase(interactive)
+    : undefined;
   await vault.initialize(passphrase);
   return vault;
 }
@@ -354,7 +367,7 @@ program
   .option('--port <port>', 'Port for SSE transport', '3100')
   .action(async (options) => {
     const config = await loadConfig();
-    const vault = await openVault(config);
+    const vault = await openVault(config, false); // serve mode = no TTY for passphrase prompt
     const logger = new AuditLogger(config.auditLogPath);
 
     const server = new AppServer(vault, logger, config);
@@ -379,13 +392,13 @@ if (process.argv.length <= 2) {
   (async () => {
     try {
       const config = await loadConfig();
-      const vault = await openVault(config);
+      const vault = await openVault(config, true);
       const logger = new AuditLogger(config.auditLogPath);
       await runTUI(vault, logger, config);
       await vault.close();
     } catch (err: any) {
-      // If vault can't be opened (no passphrase, etc.), fall through to help
-      program.parse();
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
     }
   })();
 } else {

@@ -30,9 +30,9 @@
   "author": "Brian Dawson",
   "repository": {
     "type": "git",
-    "url": "https://github.com/briandawson/key-silk.git"
+    "url": "https://github.com/itsocialist/key-silk.git"
   },
-  "homepage": "https://github.com/briandawson/key-silk#readme",
+  "homepage": "https://github.com/itsocialist/key-silk#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.4.1",
     "commander": "^13.1.0",

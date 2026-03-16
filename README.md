@@ -52,7 +52,7 @@ When AI coding assistants need API keys or credentials to set up a project, you'
 ### 1. Install
 
 ```bash
-git clone https://github.com/briandawson/key-silk.git
+git clone https://github.com/itsocialist/key-silk.git
 cd key-silk
 npm install
 npm run build

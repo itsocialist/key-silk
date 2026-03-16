@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Vault data — NEVER commit secrets
+vault/
+*.enc
+*.enc.bak
+audit.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Internal planning docs (not user-facing)
+mcp-secret-server-spec.md
+docs/two_day_offsite_transcript.md
+
+# Agent config (internal dev tooling)
+/.agent/
+/.agents/
+/_agents/
+/_agent/
+.gemini/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

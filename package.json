@@ -1,0 +1,49 @@
+{
+  "name": "key-silk",
+  "version": "1.0.0",
+  "description": "Secure, human-in-the-loop secret management for AI-assisted development via MCP",
+  "main": "dist/index.js",
+  "bin": {
+    "key-silk": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "jest",
+    "test:verbose": "jest --verbose",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "mcp",
+    "secrets",
+    "security",
+    "dotenv",
+    "vault",
+    "ai",
+    "llm",
+    "model-context-protocol",
+    "1password",
+    "doppler"
+  ],
+  "license": "MIT",
+  "author": "Brian Dawson",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/briandawson/key-silk.git"
+  },
+  "homepage": "https://github.com/briandawson/key-silk#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.4.1",
+    "commander": "^13.1.0",
+    "enquirer": "^2.4.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.13.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

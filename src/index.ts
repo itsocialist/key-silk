@@ -8,6 +8,7 @@ import { loadConfig, defaultConfig, ServerConfig } from './config/config';
 import { createVault } from './vault/factory';
 import { VaultBackend } from './vault/vault';
 import { EncryptedFileVault } from './vault/encrypted-file';
+import { runTUI } from './tui';
 import { prompt } from 'enquirer';
 import * as path from 'path';
 
@@ -30,8 +31,8 @@ async function openVault(config: ServerConfig): Promise<VaultBackend> {
 }
 
 program
-  .name('mcp-secret-server')
-  .description('Secure, human-in-the-loop secret management for AI-assisted development')
+  .name('key-silk')
+  .description('🔐 Secure, human-in-the-loop secret management for AI-assisted development')
   .version('1.0.0');
 
 // ── init ─────────────────────────────────────────────────────────
@@ -361,4 +362,32 @@ program
     await server.run(transport, parseInt(options.port || String(config.ssePort)));
   });
 
-program.parse();
+// ── tui (interactive dashboard) ──────────────────────────────────
+program
+  .command('tui')
+  .description('Launch interactive terminal dashboard')
+  .action(async () => {
+    const config = await loadConfig();
+    const vault = await openVault(config);
+    const logger = new AuditLogger(config.auditLogPath);
+    await runTUI(vault, logger, config);
+    await vault.close();
+  });
+
+// If no command given, launch TUI
+if (process.argv.length <= 2) {
+  (async () => {
+    try {
+      const config = await loadConfig();
+      const vault = await openVault(config);
+      const logger = new AuditLogger(config.auditLogPath);
+      await runTUI(vault, logger, config);
+      await vault.close();
+    } catch (err: any) {
+      // If vault can't be opened (no passphrase, etc.), fall through to help
+      program.parse();
+    }
+  })();
+} else {
+  program.parse();
+}

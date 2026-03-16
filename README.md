@@ -56,12 +56,13 @@ git clone https://github.com/itsocialist/key-silk.git
 cd key-silk
 npm install
 npm run build
+npm link        # makes `key-silk` available globally
 ```
 
 ### 2. Initialize Your Vault
 
 ```bash
-npx tsx src/index.ts init
+key-silk init
 # Enter a master passphrase when prompted
 ```
 
@@ -71,22 +72,30 @@ npx tsx src/index.ts init
 export MCP_VAULT_PASSPHRASE="your-passphrase"
 
 # Add an API key
-npx tsx src/index.ts add ANTHROPIC_API_KEY -t api_key -g ai-providers
+key-silk add ANTHROPIC_API_KEY -t api_key -g ai-providers
 
 # Add a database URL
-npx tsx src/index.ts add DATABASE_URL -t other -g infrastructure
+key-silk add DATABASE_URL -t other -g infrastructure
 
 # Add a secret with an expiration date
-npx tsx src/index.ts add TEMP_TOKEN -t oauth_token -g temporary -e 2026-04-01T00:00:00Z
+key-silk add TEMP_TOKEN -t oauth_token -g temporary -e 2026-04-01T00:00:00Z
 ```
 
 ### 4. Inject Into a Project
 
 ```bash
-npx tsx src/index.ts inject -g ai-providers --target /path/to/project/.env
+key-silk inject -g ai-providers --target /path/to/project/.env
 ```
 
-### 5. Connect to Your AI Agent (MCP)
+### 5. Launch the Interactive Dashboard
+
+```bash
+key-silk          # launches TUI when run with no arguments
+# or explicitly:
+key-silk tui
+```
+
+### 6. Connect to Your AI Agent (MCP)
 
 Add to your MCP client configuration (e.g., Claude Desktop):
 
@@ -94,8 +103,8 @@ Add to your MCP client configuration (e.g., Claude Desktop):
 {
   "mcpServers": {
     "key-silk": {
-      "command": "node",
-      "args": ["/path/to/key-silk/dist/index.js", "serve"],
+      "command": "key-silk",
+      "args": ["serve"],
       "env": {
         "MCP_VAULT_PASSPHRASE": "your-passphrase"
       }
@@ -108,26 +117,76 @@ Now your AI agent can discover and inject secrets without ever seeing the values
 
 ---
 
+## Interfaces
+
+Key Silk provides **three interfaces** for different workflows:
+
+### CLI (Direct Commands)
+Fast, scriptable commands for automation and CI:
+```bash
+key-silk list
+key-silk add API_KEY -t api_key -g prod
+key-silk inject -g prod --target .env
+```
+
+### TUI (Interactive Dashboard)
+Menu-driven terminal interface with color-coded tables, guided workflows, and visual status:
+```bash
+key-silk        # or `key-silk tui`
+```
+
+```
+  ╔═══════════════════════════════════════════╗
+  ║   🔐 Key Silk — Secret Manager            ║
+  ║   Secure secrets for AI development        ║
+  ╚═══════════════════════════════════════════╝
+
+  Backend: encrypted-file  │  ● connected  │  ~/.mcp-secrets/vault.enc
+
+  ? What would you like to do?
+    📋  List Secrets
+    📁  List Groups
+    ➕  Add Secret
+    🗑️   Remove Secret
+    🔄  Rotate Secret
+    💉  Inject to .env
+    ⏰  Expiring Secrets
+    📜  Audit Trail
+    📄  Templates
+    👋  Quit
+```
+
+### MCP Server (AI Agent Interface)
+Runs as a background MCP server that AI coding agents connect to:
+```bash
+key-silk serve                       # stdio (default)
+key-silk serve --transport sse       # Server-Sent Events for remote agents
+```
+
+---
+
 ## CLI Reference
 
 | Command | Description |
 |---|---|
-| `init [--backend <type>]` | Initialize a new vault (encrypted-file, onepassword, doppler) |
-| `add <key> [options]` | Add a new secret interactively |
-| `list\|ls [-g group]` | List secret metadata (never shows values) |
-| `groups` | List all secret groups |
-| `remove\|rm <key>` | Remove a secret from the vault |
-| `rotate <key>` | Rotate (update) a secret's value |
-| `inject -g <group> --target <path>` | Inject secrets to a `.env` file |
-| `expiring [-d days]` | Show secrets expiring soon |
-| `audit [-k key] [-a action]` | View the audit trail |
-| `templates` | List available `.env` templates |
-| `serve [--transport stdio\|sse]` | Start the MCP server |
+| `key-silk` | Launch interactive TUI dashboard |
+| `key-silk init [--backend <type>]` | Initialize a new vault |
+| `key-silk add <key> [opts]` | Add a secret interactively |
+| `key-silk list` \| `ls` `[-g group]` | List secret metadata (never shows values) |
+| `key-silk groups` | List all secret groups |
+| `key-silk remove` \| `rm` `<key>` | Remove a secret |
+| `key-silk rotate <key>` | Rotate (update) a secret's value |
+| `key-silk inject -g <group> --target <path>` | Inject secrets to a `.env` file |
+| `key-silk expiring [-d days]` | Show secrets expiring soon |
+| `key-silk audit [-k key] [-a action]` | View the audit trail |
+| `key-silk templates` | List available `.env` templates |
+| `key-silk serve [--transport stdio\|sse]` | Start the MCP server |
+| `key-silk tui` | Launch interactive TUI |
 
 ### Add Options
 
 ```bash
-npx tsx src/index.ts add <KEY> \
+key-silk add <KEY> \
   -t, --type <type>         # api_key, client_id, client_secret, oauth_token, other
   -g, --group <groups>      # Comma-separated groups
   -d, --description <desc>  # Human-readable description
@@ -137,7 +196,7 @@ npx tsx src/index.ts add <KEY> \
 ### Inject Options
 
 ```bash
-npx tsx src/index.ts inject \
+key-silk inject \
   -g, --group <group>       # Group to inject
   --target <path>           # Target .env file path
   --template <name>         # Template name (default, nextjs, node-api, etc.)
@@ -172,7 +231,7 @@ Key Silk supports three vault backends:
 Local AES-256-GCM encrypted JSON file. No external dependencies.
 
 ```bash
-npx tsx src/index.ts init --backend encrypted-file
+key-silk init --backend encrypted-file
 ```
 
 ### 1Password CLI
@@ -216,10 +275,10 @@ Key Silk ships with `.env` templates for common project types:
 
 ```bash
 # List available templates
-npx tsx src/index.ts templates
+key-silk templates
 
 # Inject using a template as the base
-npx tsx src/index.ts inject -g ai-providers --target .env --template nextjs
+key-silk inject -g ai-providers --target .env --template nextjs
 ```
 
 ---
@@ -290,8 +349,8 @@ All conditions must match for auto-approval. Every auto-approved injection is st
 # Install dependencies
 npm install
 
-# Run in development mode
-npx tsx src/index.ts <command>
+# Run in development mode (without building)
+npm run dev -- <command>     # e.g., npm run dev -- list
 
 # Run tests
 npm test
@@ -299,8 +358,11 @@ npm test
 # Build for production
 npm run build
 
+# Link globally
+npm link
+
 # Run built version
-node dist/index.js <command>
+key-silk <command>
 ```
 
 ---

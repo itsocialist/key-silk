@@ -63,7 +63,7 @@ program
         name: 'passphrase',
         message: 'Enter a master passphrase for the new vault'
       });
-      const config = defaultConfig();
+      const config = await loadConfig();
       const vault = new EncryptedFileVault(config.vaultPath);
       await vault.initialize(passphrase);
       console.log(`✓ Vault initialized at ${config.vaultPath}`);

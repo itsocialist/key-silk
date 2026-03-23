@@ -420,8 +420,12 @@ npm install
 # Run in development mode (TypeScript, no build step)
 npm run dev -- <command>     # e.g., npm run dev -- list
 
-# Run tests (22 tests)
+# JavaScript unit tests (Jest — 63 tests)
 npm test
+
+# Python integration tests (end-to-end CLI)
+pip install -r tests/requirements.txt
+pytest -m key_silk          # 13 tests against the real binary
 
 # Build for production
 npm run build

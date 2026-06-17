@@ -409,6 +409,16 @@ The codebase is ~2,500 lines of TypeScript, small enough to audit in an afternoo
 
 <br/>
 
+> ⚠️ **Known limitation — passphrase in MCP client config.** Running as an MCP
+> server (`key-silk serve`) requires `MCP_VAULT_PASSPHRASE` in the environment.
+> MCP clients (Claude Desktop, Cursor, `claude mcp add`) store this value in
+> **plaintext** in their config file (e.g. `~/.claude.json`). Anyone who can read
+> that file can unlock the vault. Until keychain support lands, treat the client
+> config as sensitive (`chmod 600`) or source the passphrase from a secret manager
+> via a launcher script. Tracked in [docs/TECH_DEBT.md](docs/TECH_DEBT.md).
+
+<br/>
+
 ---
 
 ## 🧑‍💻 Development

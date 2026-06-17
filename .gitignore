@@ -5,7 +5,9 @@ node_modules/
 dist/
 
 # Vault data — NEVER commit secrets
-vault/
+# NOTE: anchored with a leading slash so this ONLY ignores the runtime vault
+# data dir at the repo root — NOT the src/vault/ source directory.
+/vault/
 *.enc
 *.enc.bak
 audit.log
@@ -18,13 +20,20 @@ audit.log
 # Internal planning docs (not user-facing)
 mcp-secret-server-spec.md
 docs/two_day_offsite_transcript.md
+MIGRATION_REPORT.md
 
-# Agent config (internal dev tooling)
+# Agent config (internal dev tooling — kept local, not published)
 /.agent/
 /.agents/
 /_agents/
 /_agent/
 .gemini/
+.claude/
+.rafter.json
+CLAUDE.md
+
+# Stray asset (duplicate of logo/social-preview)
+docs/assets/key Silk.png
 
 # OS artifacts
 .DS_Store

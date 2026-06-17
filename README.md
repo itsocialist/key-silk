@@ -445,7 +445,15 @@ npm link
 
 # Run built version
 key-silk <command>
+
+# Install git hooks (blocks accidental commit of secrets/vault files)
+./scripts/install-hooks.sh
 ```
+
+Every push and PR runs CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)):
+typecheck, build, Jest + Python integration suites, a dependency audit, and a
+[gitleaks](https://github.com/gitleaks/gitleaks) secret scan. Run the hook
+installer once after cloning so secret material can't be committed locally.
 
 <br/>
 

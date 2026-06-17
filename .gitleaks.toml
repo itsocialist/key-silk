@@ -1,0 +1,19 @@
+# gitleaks configuration for Key Silk.
+# Extends the built-in ruleset; adds allowlists for known-safe fixtures so the
+# scanner does not flag placeholder/template material.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Non-secret fixtures and documentation"
+paths = [
+  '''templates/.*\.tmpl$''',   # .env templates ship empty placeholders
+  '''tests/.*''',              # integration-test fixtures
+  '''docs/.*''',               # docs include illustrative example config
+  '''README\.md''',            # quick-start shows placeholder passphrase
+]
+# Illustrative placeholders that appear in docs/examples
+regexes = [
+  '''your-passphrase''',
+  '''MCP_VAULT_PASSPHRASE=.*''',
+]

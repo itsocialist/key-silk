@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# Key Silk pre-commit hook — block accidental commit of secret material.
+#
+# Two layers:
+#   1. Dependency-free pattern guard: refuses to commit vault/secret files
+#      (the exact class of mistake that once shipped src/vault data, and that
+#      would ship a real vault/.env if the .gitignore ever regresses).
+#   2. If `gitleaks` is installed, run a staged-content scan for secrets.
+#
+# Install with: ./scripts/install-hooks.sh
+set -euo pipefail
+
+# Files staged for commit (added/copied/modified), NUL-safe.
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+# 1. Pattern guard — paths that must never be committed.
+#    (Matches the .gitignore "NEVER commit secrets" section.)
+blocked_regex='(^|/)\.env($|\.)|\.enc(\.bak)?$|(^|/)audit\.log$|(^|/)vault/'
+# Allow the documented example file.
+violations=$(printf '%s\n' "$staged" | grep -E "$blocked_regex" | grep -vE '(^|/)\.env\.example$' || true)
+
+if [ -n "$violations" ]; then
+  echo "✋ pre-commit: refusing to commit secret/vault files:" >&2
+  printf '   - %s\n' $violations >&2
+  echo "   If this is intentional, bypass with: git commit --no-verify" >&2
+  exit 1
+fi
+
+# 2. gitleaks staged scan (optional — only if installed).
+if command -v gitleaks >/dev/null 2>&1; then
+  echo "🔍 pre-commit: gitleaks scanning staged changes…" >&2
+  if ! gitleaks protect --staged --redact --no-banner; then
+    echo "✋ pre-commit: gitleaks found potential secrets (see above)." >&2
+    echo "   Bypass with: git commit --no-verify" >&2
+    exit 1
+  fi
+fi
+
+exit 0

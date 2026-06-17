@@ -420,7 +420,7 @@ npm install
 # Run in development mode (TypeScript, no build step)
 npm run dev -- <command>     # e.g., npm run dev -- list
 
-# JavaScript unit tests (Jest — 63 tests)
+# JavaScript unit tests (Jest — 74 tests)
 npm test
 
 # Python integration tests (end-to-end CLI)

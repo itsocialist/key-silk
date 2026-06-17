@@ -190,8 +190,13 @@ Runs as a headless MCP server for AI coding assistants:
 
 ```bash
 key-silk serve                       # stdio (default — Claude, Cursor)
-key-silk serve --transport sse       # SSE for remote agents
+key-silk serve --transport sse       # SSE — binds 127.0.0.1 by default
 ```
+
+> The SSE endpoint binds to loopback (`127.0.0.1`) and is unauthenticated by
+> default. To expose it to other hosts, set `MCP_SSE_TOKEN` (required as a
+> `Bearer` token) and `MCP_SSE_HOST` — the server refuses to bind off-host
+> without a token.
 
 <br/>
 
@@ -354,6 +359,8 @@ Configure via environment variables or `~/.mcp-secrets/config.json`:
 | `MCP_AUDIT_LOG_PATH` | `~/.mcp-secrets/audit.log` | Audit log location |
 | `MCP_TRANSPORT` | `stdio` | MCP transport (stdio or sse) |
 | `MCP_SSE_PORT` | `3100` | SSE transport port |
+| `MCP_SSE_HOST` | `127.0.0.1` | SSE bind address (loopback by default) |
+| `MCP_SSE_TOKEN` | — | Bearer token required to expose SSE off-host |
 | `MCP_AUTO_APPROVE` | `false` | Enable auto-approve policies |
 | `MCP_TEMPLATE_DIR` | `./templates` | Template directory |
 | `MCP_EXPIRATION_WARNING_DAYS` | `7` | Expiration warning threshold |

@@ -44,35 +44,39 @@ of that review, is done — see above.)
 
 ### 1. Dependency vulnerabilities
 
-**Status:** open · **Severity:** high
+**Status:** ✅ resolved · **Severity:** high
 
-`npm audit` reports 31 advisories (1 critical, 4 high) — `path-to-regexp` &
-`picomatch` ReDoS, `qs` DoS — pulled in via the MCP SDK's SSE/HTTP transport.
-The CI `audit` job runs `npm audit --audit-level=high` but is **non-blocking**
-until this is cleared. **Fix:** `npm audit fix` (non-breaking for the reported
-set), then drop `continue-on-error` from the CI audit step.
+`npm audit fix` cleared all high/critical advisories (path-to-regexp / picomatch
+ReDoS, qs DoS). The CI `audit` job now runs `npm audit --audit-level=high` as a
+**blocking** gate. Residual advisories (19 moderate, 1 low) are dev-only
+(jest → babel chain) and do not trip the high+ gate — see item 11.
 
 ### 2. SSE transport unauthenticated & network-exposed (and half-broken)
 
-**Status:** open · **Severity:** high
+**Status:** ✅ resolved · **Severity:** high
 
-`server.ts run()` binds `httpServer.listen(port)` to all interfaces with no auth,
-so any host on the network can call the no-approval tools (`secret_list`,
-`secret_audit`, `secret_expiring`) and read key names, target paths, and the
-audit trail. The `POST /messages` handler is also a no-op, so the channel is
-non-functional. **Fix:** bind to `127.0.0.1`, require a bearer token, fix the
-message routing — or mark SSE experimental and drop it from the README.
+`server.ts run()` now binds to `127.0.0.1` by default, refuses to bind off-host
+without `MCP_SSE_TOKEN` (enforced as a `Bearer` token on every request), and
+routes `POST /messages` to the matching session's transport via
+`handlePostMessage` (previously a no-op). Host override via `MCP_SSE_HOST`.
 
 ### 3. Auto-approve glob can bypass human review
 
-**Status:** open · **Severity:** high
+**Status:** ✅ resolved · **Severity:** high
 
-`policies.ts matchGlob` builds a `RegExp` without escaping literal regex
-metacharacters, so `.env` matches "any char" + `env` and a policy can approve
-unintended paths — and auto-approve is the only path that skips the human gate.
-Paths are not canonicalized (`..` traversal), and `requireSameMachine` is
-declared in the policy type but never enforced. **Fix:** escape literals,
-`realpath` before matching, implement or remove `requireSameMachine`.
+`matchGlob` now scans the pattern char-by-char, escaping every literal
+metacharacter so `.env` matches only a literal `.env`. The target path is
+canonicalized with `path.resolve` (collapsing `..`) before matching, closing the
+traversal bypass. The unenforced `requireSameMachine` field was removed from the
+policy type. Covered by regression tests in `policies.spec.ts`.
+
+### 11. Residual moderate dev-dependency advisories
+
+**Status:** open · **Severity:** low
+
+19 moderate + 1 low advisories remain in the jest/babel dev-dependency chain.
+They don't ship in the published package and don't trip the CI high+ gate.
+**Fix:** bump jest/ts-jest when convenient (may be a breaking major).
 
 ### 4. Incomplete `.env` value escaping
 

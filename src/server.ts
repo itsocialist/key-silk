@@ -197,6 +197,14 @@ export class AppServer {
   }
 
   private async handleInject(args: any) {
+    // Security Note: require an explicit path and canonicalize it (resolving
+    // `..`) so the approval prompt, auto-approve policy match, and the actual
+    // write all refer to the same absolute location — no traversal mismatch.
+    if (typeof args.targetPath !== 'string' || args.targetPath.trim().length === 0) {
+      return { isError: true, content: [{ type: "text" as const, text: 'targetPath is required.' }] };
+    }
+    args.targetPath = path.resolve(args.targetPath);
+
     // Resolve keys from explicit list + groups
     let keysToInject = new Set<string>(args.keys || []);
     const allGroups = new Set<string>();
@@ -434,25 +442,62 @@ export class AppServer {
   async run(transport?: 'stdio' | 'sse', port?: number) {
     if (transport === 'sse') {
       const http = await import('http');
+      const ssePort = port || 3100;
+      const host = process.env.MCP_SSE_HOST || '127.0.0.1';
+      const token = process.env.MCP_SSE_TOKEN;
+      const isLocal = host === '127.0.0.1' || host === '::1' || host === 'localhost';
+
+      // Security Note: never expose an unauthenticated SSE endpoint off-host.
+      // Default binding is loopback; binding elsewhere requires a bearer token.
+      if (!token && !isLocal) {
+        throw new Error(
+          `Refusing to start SSE on ${host} without MCP_SSE_TOKEN. ` +
+          `Set a bearer token, or bind to 127.0.0.1 (the default).`
+        );
+      }
+
+      const authorized = (req: any): boolean =>
+        !token || req.headers['authorization'] === `Bearer ${token}`;
+
+      // Track live transports by session so POSTed messages route to the right one.
+      const transports = new Map<string, SSEServerTransport>();
+
       const httpServer = http.createServer(async (req, res) => {
-        if (req.method === 'GET' && req.url === '/sse') {
+        if (!authorized(req)) {
+          res.writeHead(401, { 'content-type': 'text/plain' });
+          res.end('Unauthorized');
+          return;
+        }
+
+        const url = new URL(req.url || '/', `http://${host}:${ssePort}`);
+
+        if (req.method === 'GET' && url.pathname === '/sse') {
           const sseTransport = new SSEServerTransport('/messages', res);
+          transports.set(sseTransport.sessionId, sseTransport);
+          res.on('close', () => transports.delete(sseTransport.sessionId));
           await this.server.connect(sseTransport);
-        } else if (req.method === 'POST' && req.url === '/messages') {
-          let body = '';
-          req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
-          req.on('end', () => {
-            res.writeHead(200);
-            res.end('ok');
-          });
+        } else if (req.method === 'POST' && url.pathname === '/messages') {
+          // Security Note: route the POST body into the matching SSE session's
+          // transport (the previous implementation discarded it — non-functional).
+          const sessionId = url.searchParams.get('sessionId') || '';
+          const t = transports.get(sessionId);
+          if (!t) {
+            res.writeHead(404, { 'content-type': 'text/plain' });
+            res.end('No active SSE session for sessionId');
+            return;
+          }
+          await t.handlePostMessage(req, res);
         } else {
           res.writeHead(404);
           res.end('Not Found');
         }
       });
-      const ssePort = port || 3100;
-      httpServer.listen(ssePort, () => {
-        console.error(`MCP Secret Server (SSE) listening on http://localhost:${ssePort}/sse`);
+
+      httpServer.listen(ssePort, host, () => {
+        console.error(`MCP Secret Server (SSE) listening on http://${host}:${ssePort}/sse`);
+        if (!token) {
+          console.error('⚠️  No MCP_SSE_TOKEN set — endpoint is unauthenticated (bound to loopback only).');
+        }
       });
     } else {
       const stdioTransport = new StdioServerTransport();

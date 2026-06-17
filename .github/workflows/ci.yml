@@ -71,11 +71,9 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
-      # NOTE: non-blocking for now — there is a known backlog of advisories
-      # (see docs/TECH_DEBT.md "Dependency vulnerabilities"). Once those are
-      # resolved, drop `continue-on-error` so high/critical advisories fail CI.
+      # Blocking: fails CI on any high/critical advisory. (Remaining moderate
+      # advisories are dev-only — jest/babel chain — and tracked in TECH_DEBT.md.)
       - name: npm audit (high+)
-        continue-on-error: true
         run: npm audit --audit-level=high
 
   secrets:

@@ -9,8 +9,7 @@ export interface ApprovalPolicy {
   conditions: {
     groups?: string[];           // Only auto-approve for these groups
     maxSecrets?: number;         // Only if N or fewer secrets requested
-    targetPathPattern?: string;  // Glob pattern for allowed paths
-    requireSameMachine?: boolean;
+    targetPathPattern?: string;  // Glob pattern for allowed paths (canonicalized)
   };
 }
 

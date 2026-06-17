@@ -79,3 +79,44 @@ describe('Auto-Approve Policies', () => {
     expect(result.policyName).toBe('dev-safe');
   });
 });
+
+describe('Auto-Approve glob hardening (regression)', () => {
+  const policy: ApprovalPolicy[] = [
+    { name: 'dev-safe', conditions: { targetPathPattern: '/Users/*/projects/**/.env' } }
+  ];
+
+  it('does NOT treat the literal "." in the pattern as a wildcard', () => {
+    // A file literally named "Xenv" must not satisfy a "/.env" pattern.
+    const result = evaluateAutoApproval(policy, ['K'], [], '/Users/dev/projects/app/Xenv');
+    expect(result.approved).toBe(false);
+  });
+
+  it('still approves a genuine .env match', () => {
+    const result = evaluateAutoApproval(policy, ['K'], [], '/Users/dev/projects/app/.env');
+    expect(result.approved).toBe(true);
+  });
+
+  it('canonicalizes path traversal before matching (no bypass via ..)', () => {
+    // Raw string would satisfy the glob, but resolves to /etc/.env — outside scope.
+    const result = evaluateAutoApproval(
+      policy, ['K'], [],
+      '/Users/dev/projects/sub/../../../../etc/.env'
+    );
+    expect(result.approved).toBe(false);
+  });
+
+  it('* does not cross path separators', () => {
+    const single: ApprovalPolicy[] = [
+      { name: 's', conditions: { targetPathPattern: '/Users/*/.env' } }
+    ];
+    expect(evaluateAutoApproval(single, ['K'], [], '/Users/a/b/.env').approved).toBe(false);
+    expect(evaluateAutoApproval(single, ['K'], [], '/Users/a/.env').approved).toBe(true);
+  });
+
+  it('** spans path separators', () => {
+    const star: ApprovalPolicy[] = [
+      { name: 's', conditions: { targetPathPattern: '/Users/**/.env' } }
+    ];
+    expect(evaluateAutoApproval(star, ['K'], [], '/Users/a/b/c/.env').approved).toBe(true);
+  });
+});

@@ -284,7 +284,7 @@ async function tuiRotateSecret(vault: VaultBackend, audit: AuditLogger) {
 
 // ── Inject ───────────────────────────────────────────────────────
 
-async function tuiInject(vault: VaultBackend, audit: AuditLogger, config: ServerConfig) {
+export async function tuiInject(vault: VaultBackend, audit: AuditLogger, config: ServerConfig) {
   const secrets = await vault.listSecrets();
   if (secrets.length === 0) {
     console.log(DIM('  No secrets to inject.'));
@@ -306,6 +306,33 @@ async function tuiInject(vault: VaultBackend, audit: AuditLogger, config: Server
     message: 'Select group to inject',
     choices: Array.from(allGroups)
   });
+
+  const groupSecrets = secrets.filter(s => s.groups.includes(group));
+  const allGroupKeys = groupSecrets.map(s => s.key);
+
+  const { keyScope } = await prompt<{ keyScope: string }>({
+    type: 'select',
+    name: 'keyScope',
+    message: 'Which keys to inject?',
+    choices: ['All keys in group', 'Select individual keys']
+  });
+
+  let keys: string[];
+  if (keyScope === 'Select individual keys') {
+    const { selectedKeys } = await prompt<{ selectedKeys: string[] }>({
+      type: 'multiselect',
+      name: 'selectedKeys',
+      message: 'Select keys to inject (space to toggle)',
+      choices: allGroupKeys
+    });
+    keys = selectedKeys;
+    if (keys.length === 0) {
+      console.log(DIM('  Nothing selected. Aborted.'));
+      return;
+    }
+  } else {
+    keys = allGroupKeys;
+  }
 
   const { targetPath } = await prompt<{ targetPath: string }>({
     type: 'input',
@@ -359,9 +386,6 @@ async function tuiInject(vault: VaultBackend, audit: AuditLogger, config: Server
       return;
     }
   }
-
-  const groupSecrets = secrets.filter(s => s.groups.includes(group));
-  const keys = groupSecrets.map(s => s.key);
 
   // Show what will be injected
   console.log(BOLD(`\n  Injecting ${keys.length} secret(s) to ${targetPath}:`));

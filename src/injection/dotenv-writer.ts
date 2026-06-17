@@ -146,7 +146,9 @@ export async function checkGitignore(targetPath: string): Promise<boolean> {
     } catch {
       // No .gitignore here, keep walking
     }
-    dir = path.dirname(dir);
+    const parent = path.dirname(dir);
+    if (parent === dir) break; // reached filesystem root (handles relative paths like '.')
+    dir = parent;
   }
   return false;
 }

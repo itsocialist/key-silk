@@ -7,6 +7,7 @@ import {
 } from './vault';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { assertCliSafe } from './cli-safe';
 
 const execFileAsync = promisify(execFile);
 
@@ -105,6 +106,7 @@ export class OnePasswordVault implements VaultBackend {
     this.ensureReady();
     const map = new Map<string, string>();
     for (const key of keys) {
+      assertCliSafe(key, 'secret key');
       try {
         // Get the "password" or "credential" field value
         const value = await this.exec([
@@ -132,6 +134,8 @@ export class OnePasswordVault implements VaultBackend {
 
   async addSecret(entry: SecretEntry): Promise<void> {
     this.ensureReady();
+    assertCliSafe(entry.key, 'secret key');
+    entry.groups.forEach(g => assertCliSafe(g, 'group'));
     const tags = entry.groups.length > 0 ? ['--tags', entry.groups.join(',')] : [];
     await this.exec([
       'item', 'create',
@@ -145,11 +149,13 @@ export class OnePasswordVault implements VaultBackend {
 
   async removeSecret(key: string): Promise<void> {
     this.ensureReady();
+    assertCliSafe(key, 'secret key');
     await this.exec(['item', 'delete', key, '--vault', this.vaultName]);
   }
 
   async rotateSecret(key: string, newValue: string): Promise<void> {
     this.ensureReady();
+    assertCliSafe(key, 'secret key');
     await this.exec([
       'item', 'edit', key, '--vault', this.vaultName,
       `credential=${newValue}`
@@ -158,8 +164,10 @@ export class OnePasswordVault implements VaultBackend {
 
   async upsertGroup(group: SecretGroup): Promise<void> {
     this.ensureReady();
+    assertCliSafe(group.name, 'group');
     // 1Password tags are applied per-item; we tag each listed secret
     for (const secretKey of group.secrets) {
+      assertCliSafe(secretKey, 'secret key');
       try {
         await this.exec([
           'item', 'edit', secretKey, '--vault', this.vaultName,

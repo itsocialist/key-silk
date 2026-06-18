@@ -24,6 +24,9 @@ export interface ServerConfig {
   templateDir: string;
   backupOnWrite: boolean;
 
+  // If non-empty, secret_inject targets must resolve within one of these roots.
+  injectAllowedRoots: string[];
+
   // 1Password backend config
   onePasswordVault: string;
 
@@ -48,6 +51,7 @@ export function defaultConfig(): ServerConfig {
     approvalPolicies: [],
     templateDir: path.join(__dirname, '..', '..', 'templates'),
     backupOnWrite: true,
+    injectAllowedRoots: [],
     onePasswordVault: 'Development',
     expirationWarningDays: 7,
   };
@@ -103,6 +107,13 @@ export async function loadConfig(): Promise<ServerConfig> {
   }
   if (process.env.MCP_EXPIRATION_WARNING_DAYS) {
     config.expirationWarningDays = parseInt(process.env.MCP_EXPIRATION_WARNING_DAYS, 10);
+  }
+  if (process.env.MCP_INJECT_ALLOWED_ROOTS) {
+    config.injectAllowedRoots = process.env.MCP_INJECT_ALLOWED_ROOTS
+      .split(',')
+      .map(r => r.trim())
+      .filter(r => r.length > 0)
+      .map(r => path.resolve(r));
   }
 
   return config;

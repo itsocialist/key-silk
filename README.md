@@ -362,6 +362,7 @@ Configure via environment variables or `~/.mcp-secrets/config.json`:
 | `MCP_SSE_HOST` | `127.0.0.1` | SSE bind address (loopback by default) |
 | `MCP_SSE_TOKEN` | — | Bearer token required to expose SSE off-host |
 | `MCP_AUTO_APPROVE` | `false` | Enable auto-approve policies |
+| `MCP_INJECT_ALLOWED_ROOTS` | — | Comma-separated dirs; if set, inject targets must resolve within one |
 | `MCP_TEMPLATE_DIR` | `./templates` | Template directory |
 | `MCP_EXPIRATION_WARNING_DAYS` | `7` | Expiration warning threshold |
 | `MCP_1PASSWORD_VAULT` | `Development` | 1Password vault name |
@@ -407,7 +408,7 @@ All conditions must match for auto-approval. Every auto-approved injection is st
 <tr><td>🧹 <strong>Memory</strong></td><td>Key buffers zeroed after use (<code>scrubMemory()</code>)</td></tr>
 <tr><td>🚫 <strong>LLM Isolation</strong></td><td><code>getSecretValues()</code> is internal-only — never exposed via MCP</td></tr>
 <tr><td>✋ <strong>Approval</strong></td><td>Interactive TTY prompt via <code>/dev/tty</code> — works even under MCP stdio</td></tr>
-<tr><td>📋 <strong>Audit</strong></td><td>Append-only JSON-lines log of every operation</td></tr>
+<tr><td>📋 <strong>Audit</strong></td><td>Append-only JSON-lines log, SHA-256 hash-chained for tamper-evidence</td></tr>
 <tr><td>💾 <strong>Backup</strong></td><td>Automatic <code>.bak</code> file before every vault write</td></tr>
 <tr><td>⚠️ <strong>Git Safety</strong></td><td><code>.gitignore</code> check warns if target <code>.env</code> is not excluded</td></tr>
 </table>

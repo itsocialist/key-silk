@@ -115,6 +115,7 @@ const BASE_CONFIG: ServerConfig = {
   approvalPolicies:      [],
   templateDir:           '/tmp/templates',
   backupOnWrite:         true,
+  injectAllowedRoots:    [],
   onePasswordVault:      'Development',
   expirationWarningDays: 7,
 };

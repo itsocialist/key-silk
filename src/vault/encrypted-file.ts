@@ -26,12 +26,21 @@ const KEY_LEN = 32;
 const SALT_LEN = 32;
 const IV_LEN = 12;
 
+/**
+ * AES-256-GCM encrypted-file vault.
+ *
+ * Security Note: this backend holds only the derived key in memory (scrubbed on
+ * close), never the decrypted vault. Each operation decrypts on demand into a
+ * local that goes out of scope immediately, so plaintext secret values are not
+ * retained on the instance for the process lifetime. (JS strings still cannot be
+ * explicitly zeroed — decrypted values may linger in the heap until GC — but
+ * their lifetime is now one operation rather than the whole session.)
+ */
 export class EncryptedFileVault implements VaultBackend {
   private vaultPath: string;
-  private data: VaultData | null = null;
   private isInitialized = false;
-  private passphraseKey: Buffer | null = null; // Key should be scrubbed aggressively
-  private currentSalt: Buffer | null = null; // Re-use salt across saves so we don't need the raw passphrase to re-derive
+  private passphraseKey: Buffer | null = null; // scrubbed aggressively on close
+  private currentSalt: Buffer | null = null;   // not secret; reused across saves
 
   constructor(vaultPath: string) {
     this.vaultPath = vaultPath;
@@ -42,6 +51,7 @@ export class EncryptedFileVault implements VaultBackend {
       this.passphraseKey.fill(0);
       this.passphraseKey = null;
     }
+    this.currentSalt = null;
   }
 
   private deriveKey(passphrase: string, salt: Buffer): Buffer {
@@ -54,18 +64,16 @@ export class EncryptedFileVault implements VaultBackend {
     }
 
     try {
-      // Check if vault exists
       let fileContent: string;
       try {
         fileContent = await fs.readFile(this.vaultPath, 'utf8');
       } catch (err: any) {
         if (err.code === 'ENOENT') {
-          // Initialize empty
+          // Initialize an empty vault.
           this.currentSalt = randomBytes(SALT_LEN);
           this.passphraseKey = this.deriveKey(passphrase, this.currentSalt);
-          this.data = { version: 1, secrets: [], groups: [] };
           this.isInitialized = true;
-          await this.save();
+          await this.saveData({ version: 1, secrets: [], groups: [] });
           return;
         }
         throw err;
@@ -75,21 +83,11 @@ export class EncryptedFileVault implements VaultBackend {
       if (payload.version !== 1) throw new Error("Unsupported vault version");
 
       this.currentSalt = Buffer.from(payload.salt, 'base64');
-      const iv = Buffer.from(payload.iv, 'base64');
-      const authTag = Buffer.from(payload.authTag, 'base64');
-      const ciphertext = Buffer.from(payload.ciphertext, 'base64');
-
       this.passphraseKey = this.deriveKey(passphrase, this.currentSalt);
 
-      const decipher = createDecipheriv('aes-256-gcm', this.passphraseKey, iv);
-      decipher.setAuthTag(authTag);
-
-      let decrypted = decipher.update(ciphertext, undefined, 'utf8');
-      decrypted += decipher.final('utf8');
-
-      this.data = JSON.parse(decrypted) as VaultData;
+      // Validate the passphrase by decrypting once; discard the plaintext.
+      this.decryptPayload(payload);
       this.isInitialized = true;
-      decrypted = "";
     } catch (e: any) {
       this.scrubMemory();
       throw new Error(`Failed to initialize vault: ${e.message}`);
@@ -97,22 +95,50 @@ export class EncryptedFileVault implements VaultBackend {
   }
 
   isReady(): boolean {
-    return this.isInitialized && this.data !== null && this.passphraseKey !== null;
+    return this.isInitialized && this.passphraseKey !== null && this.currentSalt !== null;
   }
 
   private ensureReady() {
     if (!this.isReady()) throw new Error("Vault is not initialized.");
   }
 
-  private async save() {
+  private decryptPayload(payload: EncryptedPayload): VaultData {
+    const iv = Buffer.from(payload.iv, 'base64');
+    const authTag = Buffer.from(payload.authTag, 'base64');
+    const ciphertext = Buffer.from(payload.ciphertext, 'base64');
+
+    const decipher = createDecipheriv('aes-256-gcm', this.passphraseKey!, iv);
+    decipher.setAuthTag(authTag);
+
+    let decrypted = decipher.update(ciphertext, undefined, 'utf8');
+    decrypted += decipher.final('utf8');
+    return JSON.parse(decrypted) as VaultData;
+  }
+
+  // Decrypt the current vault on demand. The returned object is the caller's to
+  // use transiently; it is not retained on the instance.
+  private async loadData(): Promise<VaultData> {
+    this.ensureReady();
+    let fileContent: string;
+    try {
+      fileContent = await fs.readFile(this.vaultPath, 'utf8');
+    } catch (err: any) {
+      if (err.code === 'ENOENT') return { version: 1, secrets: [], groups: [] };
+      throw err;
+    }
+    const payload = JSON.parse(fileContent) as EncryptedPayload;
+    return this.decryptPayload(payload);
+  }
+
+  private async saveData(data: VaultData): Promise<void> {
     this.ensureReady();
     if (!this.passphraseKey || !this.currentSalt) throw new Error("Security Context lost.");
 
     const iv = randomBytes(IV_LEN);
-    const plaintext = JSON.stringify(this.data);
-    
+    const plaintext = JSON.stringify(data);
+
     const cipher = createCipheriv('aes-256-gcm', this.passphraseKey, iv);
-    
+
     let encrypted = cipher.update(plaintext, 'utf8', 'base64');
     encrypted += cipher.final('base64');
     const authTag = cipher.getAuthTag().toString('base64');
@@ -128,10 +154,9 @@ export class EncryptedFileVault implements VaultBackend {
       ciphertext: encrypted
     };
 
-    // Ensure directory exists
     await fs.mkdir(path.dirname(this.vaultPath), { recursive: true });
-    
-    // Create backup file if exists (before writing)
+
+    // Backup the previous vault before overwriting.
     try {
       await fs.copyFile(this.vaultPath, `${this.vaultPath}.bak`);
     } catch (err: any) {
@@ -142,13 +167,13 @@ export class EncryptedFileVault implements VaultBackend {
   }
 
   async listGroups(): Promise<SecretGroup[]> {
-    this.ensureReady();
-    return this.data!.groups;
+    const data = await this.loadData();
+    return data.groups;
   }
 
   async listSecrets(filter?: SecretFilter): Promise<SecretMetadata[]> {
-    this.ensureReady();
-    let secrets = this.data!.secrets;
+    const data = await this.loadData();
+    let secrets = data.secrets;
     if (filter) {
       if (filter.group) {
         secrets = secrets.filter(s => s.groups.includes(filter.group!));
@@ -161,7 +186,8 @@ export class EncryptedFileVault implements VaultBackend {
         secrets = secrets.filter(s => s.expiresAt && new Date(s.expiresAt).getTime() < threshold);
       }
     }
-    
+
+    // Metadata only — secret values are never returned here.
     return secrets.map(s => ({
       key: s.key,
       description: s.description,
@@ -175,10 +201,10 @@ export class EncryptedFileVault implements VaultBackend {
   }
 
   async getSecretValues(keys: string[]): Promise<Map<string, string>> {
-    this.ensureReady();
+    const data = await this.loadData();
     const map = new Map<string, string>();
     for (const key of keys) {
-      const secret = this.data!.secrets.find(s => s.key === key);
+      const secret = data.secrets.find(s => s.key === key);
       if (secret) {
         map.set(key, secret.value);
       }
@@ -187,54 +213,50 @@ export class EncryptedFileVault implements VaultBackend {
   }
 
   async addSecret(entry: SecretEntry): Promise<void> {
-    this.ensureReady();
-    const existingIdx = this.data!.secrets.findIndex(s => s.key === entry.key);
+    const data = await this.loadData();
+    const existingIdx = data.secrets.findIndex(s => s.key === entry.key);
     if (existingIdx >= 0) {
-      this.data!.secrets[existingIdx] = entry;
+      data.secrets[existingIdx] = entry;
     } else {
-      this.data!.secrets.push(entry);
+      data.secrets.push(entry);
     }
-    await this.save();
+    await this.saveData(data);
   }
 
   async removeSecret(key: string): Promise<void> {
-    this.ensureReady();
-    this.data!.secrets = this.data!.secrets.filter(s => s.key !== key);
-    await this.save();
+    const data = await this.loadData();
+    data.secrets = data.secrets.filter(s => s.key !== key);
+    await this.saveData(data);
   }
 
   async rotateSecret(key: string, newValue: string): Promise<void> {
-    this.ensureReady();
-    const secret = this.data!.secrets.find(s => s.key === key);
+    const data = await this.loadData();
+    const secret = data.secrets.find(s => s.key === key);
     if (!secret) throw new Error("Secret not found");
     secret.value = newValue;
     secret.rotatedAt = new Date().toISOString();
-    await this.save();
+    await this.saveData(data);
   }
 
   async upsertGroup(group: SecretGroup): Promise<void> {
-    this.ensureReady();
-    const existingIdx = this.data!.groups.findIndex(g => g.name === group.name);
+    const data = await this.loadData();
+    const existingIdx = data.groups.findIndex(g => g.name === group.name);
     if (existingIdx >= 0) {
-      this.data!.groups[existingIdx] = group;
+      data.groups[existingIdx] = group;
     } else {
-      this.data!.groups.push(group);
+      data.groups.push(group);
     }
-    await this.save();
+    await this.saveData(data);
   }
 
   async removeGroup(name: string): Promise<void> {
-    this.ensureReady();
-    this.data!.groups = this.data!.groups.filter(g => g.name !== name);
-    await this.save();
+    const data = await this.loadData();
+    data.groups = data.groups.filter(g => g.name !== name);
+    await this.saveData(data);
   }
 
   async close(): Promise<void> {
-    if (this.isReady()) {
-      await this.save();
-    }
     this.scrubMemory();
-    this.data = null;
     this.isInitialized = false;
   }
 }

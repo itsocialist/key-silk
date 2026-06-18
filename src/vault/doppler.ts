@@ -7,6 +7,7 @@ import {
 } from './vault';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { assertCliSafe } from './cli-safe';
 
 const execFileAsync = promisify(execFile);
 
@@ -145,16 +146,19 @@ export class DopplerVault implements VaultBackend {
 
   async addSecret(entry: SecretEntry): Promise<void> {
     this.ensureReady();
+    assertCliSafe(entry.key, 'secret key');
     await this.exec(['secrets', 'set', entry.key, entry.value]);
   }
 
   async removeSecret(key: string): Promise<void> {
     this.ensureReady();
+    assertCliSafe(key, 'secret key');
     await this.exec(['secrets', 'delete', key, '--yes']);
   }
 
   async rotateSecret(key: string, newValue: string): Promise<void> {
     this.ensureReady();
+    assertCliSafe(key, 'secret key');
     // Doppler versioning handles rotation natively
     await this.exec(['secrets', 'set', key, newValue]);
   }

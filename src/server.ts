@@ -14,6 +14,14 @@ import { loadTemplate, listTemplates } from "./injection/template-loader";
 import { ServerConfig, ApprovalPolicy } from "./config/config";
 import * as path from "path";
 
+/** True if `target` (already absolute) is one of, or nested under, any root. */
+function isWithinRoots(target: string, roots: string[]): boolean {
+  return roots.some(root => {
+    const r = path.resolve(root);
+    return target === r || target.startsWith(r + path.sep);
+  });
+}
+
 export class AppServer {
   private server: Server;
   private vault: VaultBackend;
@@ -22,6 +30,7 @@ export class AppServer {
   private autoApprove: boolean;
   private approvalPolicies: ApprovalPolicy[];
   private expirationWarningDays: number;
+  private injectAllowedRoots: string[];
 
   constructor(vault: VaultBackend, audit: AuditLogger, config: ServerConfig) {
     this.vault = vault;
@@ -30,6 +39,7 @@ export class AppServer {
     this.autoApprove = config.autoApprove;
     this.approvalPolicies = config.approvalPolicies;
     this.expirationWarningDays = config.expirationWarningDays;
+    this.injectAllowedRoots = (config.injectAllowedRoots || []).map(r => path.resolve(r));
 
     this.server = new Server(
       { name: "mcp-secret-server", version: "1.0.0" },
@@ -204,6 +214,18 @@ export class AppServer {
       return { isError: true, content: [{ type: "text" as const, text: 'targetPath is required.' }] };
     }
     args.targetPath = path.resolve(args.targetPath);
+
+    // Security Note: if an allowlist is configured, the canonicalized target
+    // must fall within one of the permitted roots — reject (and audit) anything
+    // outside before we even prompt for approval.
+    if (this.injectAllowedRoots.length > 0 && !isWithinRoots(args.targetPath, this.injectAllowedRoots)) {
+      await this.audit.log({
+        action: 'deny', actor: 'llm-request', secretKeys: args.keys || [],
+        approved: false, approvalMethod: 'denied',
+        targetPath: args.targetPath, details: 'Target outside allowed roots'
+      });
+      return { isError: true, content: [{ type: "text" as const, text: `Injection DENIED. Target ${args.targetPath} is outside the allowed roots.` }] };
+    }
 
     // Resolve keys from explicit list + groups
     let keysToInject = new Set<string>(args.keys || []);

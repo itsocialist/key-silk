@@ -86,6 +86,28 @@ describe('dotenv-writer Environment Merger', () => {
     const content = await fs.readFile(TEST_ENV, 'utf8');
     expect(content).toContain('TRICKY_KEY="value_with_\\"quotes\\"_inside"');
   });
+
+  it('escapes newlines so a value cannot inject extra lines', async () => {
+    const secrets = new Map();
+    secrets.set('MULTI', 'line1\nINJECTED=evil');
+
+    await injectSecrets(TEST_ENV, secrets);
+    const content = await fs.readFile(TEST_ENV, 'utf8');
+
+    // The newline is escaped — the value stays on one physical line.
+    expect(content).toContain('MULTI="line1\\nINJECTED=evil"');
+    // No real INJECTED= entry was created.
+    expect(content).not.toMatch(/^INJECTED=evil$/m);
+  });
+
+  it('escapes backslashes (and quotes after them) correctly', async () => {
+    const secrets = new Map();
+    secrets.set('WINPATH', 'C:\\Users\\dev');
+
+    await injectSecrets(TEST_ENV, secrets);
+    const content = await fs.readFile(TEST_ENV, 'utf8');
+    expect(content).toContain('WINPATH="C:\\\\Users\\\\dev"');
+  });
 });
 
 describe('checkGitignore', () => {

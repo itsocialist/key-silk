@@ -80,44 +80,46 @@ They don't ship in the published package and don't trip the CI high+ gate.
 
 ### 4. Incomplete `.env` value escaping
 
-**Status:** open · **Severity:** medium
+**Status:** ✅ resolved · **Severity:** medium
 
-`dotenv-writer.ts` escapes only `"`. Values with newlines, backslashes, or `$`
-corrupt the file or inject extra env lines. **Fix:** escape `\`, `"`, and
-newlines, or use a vetted dotenv serializer.
+`dotenv-writer.ts` now renders values via `formatEnvValue`, escaping `\`, `"`,
+and newline/CR/tab so a value can't corrupt the file or inject extra env lines.
+Round-trips through a standard dotenv loader. Regression tests added.
 
 ### 5. Argument injection in CLI backends
 
-**Status:** open · **Severity:** medium
+**Status:** ✅ resolved · **Severity:** medium
 
-`onepassword.ts` / `doppler.ts` use `execFile` (no shell — good) but pass
-LLM-influenceable key names as positional args, so a key like `--vault` or `-X`
-could alter CLI behavior. **Fix:** insert `--` before positionals and validate
-keys against `^[A-Za-z0-9_.-]+$`.
+New `vault/cli-safe.ts` `assertCliSafe()` rejects empty values, anything
+starting with `-` (flag injection), and control characters. Applied to every
+LLM-influenceable key/group name before it reaches `op` / `doppler` in
+`onepassword.ts` and `doppler.ts`. Unit-tested.
 
 ### 6. Decrypted vault held in memory; values never scrubbed
 
-**Status:** open · **Severity:** medium
+**Status:** ✅ resolved (mitigated) · **Severity:** medium
 
-`scrubMemory()` zeroes only the derived key. The full decrypted vault lives in
-`this.data` as plaintext JS strings for the server's lifetime, and JS strings
-can't be zeroed — a gap vs. the project's "scrub secrets from memory" claim.
-**Fix:** decrypt-on-demand to minimize lifetime; document the JS-string limit.
+`EncryptedFileVault` now holds only the derived key (scrubbed on close), never
+the decrypted vault. Each operation decrypts on demand into a local that goes
+out of scope immediately, cutting plaintext lifetime from the whole session to a
+single op. JS strings still can't be explicitly zeroed (documented in-code); a
+native/`Buffer`-backed store would be the only way to fully close that.
 
 ### 7. Audit log is "append-only" by convention only
 
-**Status:** open · **Severity:** medium
+**Status:** ✅ resolved · **Severity:** medium
 
-Plain `appendFile`; anyone with file access can rewrite history undetectably, and
-it grows unbounded. **Fix:** hash-chain entries (each includes the prior hash)
-for tamper-evidence; add rotation.
+Entries are now SHA-256 hash-chained (each stores the prior entry's hash + its
+own); `verifyChain()` detects any edit/reorder/deletion. Added single-rollover
+rotation at 5 MB. Tamper-detection regression test added.
 
 ### 8. No path validation on inject `targetPath`
 
-**Status:** open · **Severity:** medium
+**Status:** ✅ resolved · **Severity:** medium
 
-`secret_inject` accepts any path from the LLM; only the human prompt guards it.
-**Fix:** enforce absolute paths and optionally restrict to allowlisted roots.
+`handleInject` requires a non-empty path, canonicalizes it with `path.resolve`,
+and — when `MCP_INJECT_ALLOWED_ROOTS` is configured — denies (and audits) any
+target outside the allowed roots before prompting. Tested.
 
 ### 9. No rekey / passphrase-change command
 

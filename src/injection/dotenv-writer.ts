@@ -49,6 +49,24 @@ function serializeDotenv(lines: EnvLine[]): string {
   return lines.map(l => l.raw).join('\n');
 }
 
+/**
+ * Render a secret value as a safe double-quoted .env field.
+ *
+ * Security Note: escaping only `"` (the previous behavior) let values
+ * containing newlines, backslashes, or carriage returns corrupt the file or
+ * inject extra lines. Escape backslash first, then quotes and control
+ * whitespace, so the result round-trips through a standard dotenv loader.
+ */
+function formatEnvValue(value: string): string {
+  const escaped = value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+  return `"${escaped}"`;
+}
+
 export interface InjectResult {
   written: number;
   skipped: string[];
@@ -88,8 +106,7 @@ export async function injectSecrets(
   const newEntries: EnvLine[] = [];
 
   for (const [key, value] of secrets.entries()) {
-    const escapedValue = value.replace(/"/g, '\\"');
-    const formattedLine = `${key}="${escapedValue}"`;
+    const formattedLine = `${key}=${formatEnvValue(value)}`;
 
     if (existingKeys.has(key)) {
       if (merge && !overwrite) {

@@ -110,6 +110,7 @@ const BASE_CONFIG: ServerConfig = {
   approvalPolicies:      [],
   templateDir:           '/tmp/templates',
   backupOnWrite:         true,
+  injectAllowedRoots:    [],
   onePasswordVault:      'Development',
   expirationWarningDays: 7,
 };
@@ -328,6 +329,31 @@ describe('AppServer — secret_inject', () => {
 
     expect(result.content[0].text).toContain('WARNING');
     expect(result.content[0].text).toContain('gitignore');
+  });
+
+  it('denies a target outside the configured allowed roots', async () => {
+    server = new AppServer(vault, audit, { ...BASE_CONFIG, injectAllowedRoots: ['/project'] });
+    vault.listSecrets.mockResolvedValue([makeSecret({ key: 'K', groups: ['g'] })]);
+
+    const result = await (server as any).handleInject({ groups: ['g'], targetPath: '/etc/.env' });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('outside the allowed roots');
+    expect(mockRequestApproval).not.toHaveBeenCalled();
+    expect(mockInjectSecrets).not.toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'deny' }));
+  });
+
+  it('allows a target within an allowed root', async () => {
+    server = new AppServer(vault, audit, { ...BASE_CONFIG, injectAllowedRoots: ['/project'] });
+    vault.listSecrets.mockResolvedValue([makeSecret({ key: 'K', groups: ['g'] })]);
+    vault.getSecretValues.mockResolvedValue(new Map([['K', 'v']]));
+    mockRequestApproval.mockResolvedValue(['K']);
+
+    const result = await (server as any).handleInject({ groups: ['g'], targetPath: '/project/app/.env' });
+
+    expect(mockInjectSecrets).toHaveBeenCalled();
+    expect(result.content[0].text).toContain('secrets written');
   });
 });
 
